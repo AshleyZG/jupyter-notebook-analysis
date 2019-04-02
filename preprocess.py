@@ -1,5 +1,3 @@
-# %load preprocess.py
-# %load preprocess.py
 'functions to preprocess data, also a try of KMeans'
 
 from config import *
@@ -146,4 +144,4 @@ if __name__ == '__main__':
 
     files = [f for f in os.listdir(nb_path) if f.endswith('.ipynb')]
     file = rancom.choice(files)
-    print(is_data_science_nb(nb_path, file
+    print(is_data_science_nb(nb_path, file))
