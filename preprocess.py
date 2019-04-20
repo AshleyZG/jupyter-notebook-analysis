@@ -1,5 +1,6 @@
 'functions to preprocess data'
 
+
 from config import *
 
 import os
@@ -31,7 +32,8 @@ def extract_code(ipynb_file):
     for cell in notebook['cells']:
         if cell['cell_type'] == 'code':
 
-            cell_sources += cell['source'] + ['\n']
+    cell_sources += cell['source'] + ['\n']
+
     return cell_sources
 
 
