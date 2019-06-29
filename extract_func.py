@@ -2,6 +2,9 @@
 import ast
 import os
 import random
+import threading
+import pdb
+
 from config import *
 from preprocess import *
 
@@ -12,6 +15,7 @@ class Visitor(ast.NodeVisitor):
     def __init__(self):
         self.nest = 0
         self.funcs = []
+        self.linenos = []
 
     def generic_visit(self, node):
 
@@ -20,8 +24,10 @@ class Visitor(ast.NodeVisitor):
     def visit_Call(self, node):
         self.nest += 1
         func = self.process_func(node.func)
+        # pdb.set_trace()
         if func != None and self.nest == 1:
             self.funcs.append(func)
+            self.linenos.append(node.lineno)
             # print(func, node.lineno)
         self.generic_visit(node)
 
@@ -43,6 +49,8 @@ class Visitor(ast.NodeVisitor):
 
     def reset_funcs(self):
         self.funcs = []
+        self.linenos = []
+        self.nest = 0
 
 
 class ModuleVisitor(ast.NodeVisitor):
@@ -91,18 +99,22 @@ mdvisitor = ModuleVisitor()
 
 
 def extract_funcs_from_py(file):
+    global module_map
     with open(file, 'r') as f:
         sources = f.read()
     funcs = []
+    linenos = []
     tree = ast.parse(sources)
     visitor.visit(tree)
 
     if visitor.funcs != []:
 
         funcs = visitor.funcs
-        visitor.reset_funcs()
-
-    return funcs
+        linenos = visitor.linenos
+        # print(funcs)
+    visitor.reset_funcs()
+    module_map = {}
+    return funcs, linenos
 
 
 def extract_module(file):
@@ -112,23 +124,16 @@ def extract_module(file):
     mdvisitor.visit(tree)
 
 
-errors = []
-
-
 def process_file(file):
-    try:
-        extract_module(file)
-        funcs = extract_funcs_from_py(file)
-        with open('temp12.txt', 'a') as fout:
-            fout.write(' '.join(funcs))
-            fout.write('\n')
-    except Exception as e:
-
-        errors.append(file)
+    extract_module(file)
+    # print(module_map)
+    funcs, linenos = extract_funcs_from_py(file)
+    return funcs, linenos
 
 
-files = [f for f in os.listdir(nb_path) if f.endswith('.py')]
+if __name__ == '__main__':
 
+    files = [f for f in os.listdir(nb_path) if f.endswith('.py')]
 
-for file in tqdm(files[110000:]):
-    process_file(os.path.join(nb_path, file))
+    for file in tqdm(files):
+        process_file(os.path.join(nb_path, file))
