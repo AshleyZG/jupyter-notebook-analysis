@@ -23,6 +23,17 @@ def is_selected_func(func):
     return False
 
 
+def new_is_selected_func(func):
+    '''
+    判断 func 是否以 'statsmodels', 'gensim', 'keras', 'sklearn', 'xgboost' 开头
+    '''
+    key_libs = ['statsmodels', 'gensim', 'keras', 'sklearn', 'xgboost']
+    if func.split('.')[0] in key_libs:
+        return True
+    else:
+        return False
+
+
 def get_target_funcs(file):
     '''
     抽取一个 python file 中所有 target functions
@@ -32,7 +43,7 @@ def get_target_funcs(file):
     funcs, linenos = process_file(file)
     # target_funcs = [func, lineno for func, lineno in zip(funcs, linenos)]
     target_funcs = [(func, lineno) for func, lineno in zip(
-        funcs, linenos) if is_selected_func(func)]
+        funcs, linenos) if new_is_selected_func(func)]
     funcs, linenos = list(zip(*target_funcs))
     funcs = list(funcs)
     linenos = list(linenos)
@@ -45,15 +56,17 @@ def temp_enter():
 
 
 if __name__ == '__main__':
-    assert False
+    # assert False
+    path = '/home/gezhang/data/jupyter/target'
     all_functions = []
     error_files = []
-    for file in tqdm(os.listdir(nb_path)):
+    for file in tqdm(os.listdir(path)):
         try:
-            funcs = get_target_funcs(os.path.join(nb_path, file))
+            funcs, _ = get_target_funcs(os.path.join(path, file))
             all_functions += funcs
         except Exception as e:
             error_files.append(file)
     print('[Info] get {} related functions'.format(len(all_functions)))
     all_functions = sorted(list(set(all_functions)))
     print('[Info] {} different functions'.format(len(all_functions)))
+    pdb.set_trace()
