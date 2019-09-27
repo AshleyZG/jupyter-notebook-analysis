@@ -1,12 +1,19 @@
-'extract function calls and replace abbreviations by full names'
+# encoding=utf-8
+# Created by Ge Zhang @ 2019
+# Contact zhangge9194@pku.edu.cn
+#
+# extract all functions from py files
+# api: process_file()
+
 import ast
 import os
 import random
-import threading
+import json
+from tqdm import tqdm
 import pdb
 
 from config import *
-from preprocess import *
+
 
 module_map = {}
 
@@ -24,11 +31,11 @@ class Visitor(ast.NodeVisitor):
     def visit_Call(self, node):
         self.nest += 1
         func = self.process_func(node.func)
-        # pdb.set_trace()
+
         if func != None and self.nest == 1:
             self.funcs.append(func)
             self.linenos.append(node.lineno)
-            # print(func, node.lineno)
+
         self.generic_visit(node)
 
         self.nest -= 1
@@ -98,10 +105,14 @@ visitor = Visitor()
 mdvisitor = ModuleVisitor()
 
 
-def extract_funcs_from_py(file):
+def extract_funcs_from_py(file=None, sources=None):
+    """
+    sources is file.read()
+    must pass **sources**
+    """
     global module_map
-    with open(file, 'r') as f:
-        sources = f.read()
+    # with open(file, 'r') as f:
+    #     sources = f.read()
     funcs = []
     linenos = []
     tree = ast.parse(sources)
@@ -111,29 +122,43 @@ def extract_funcs_from_py(file):
 
         funcs = visitor.funcs
         linenos = visitor.linenos
-        # print(funcs)
+
     visitor.reset_funcs()
     module_map = {}
     return funcs, linenos
 
 
-def extract_module(file):
-    with open(file, 'r') as f:
-        sources = f.read()
+def extract_module(file=None, sources=None):
+    """
+    sources is file.read()
+    must pass **sources**
+    """
+    # with open(file, 'r') as f:
+    #     sources = f.read()
     tree = ast.parse(sources)
     mdvisitor.visit(tree)
 
 
 def process_file(file):
-    extract_module(file)
-    # print(module_map)
-    funcs, linenos = extract_funcs_from_py(file)
+    with open(file, 'r') as f:
+        sources = f.read()
+    extract_module(sources=sources)
+
+    funcs, linenos = extract_funcs_from_py(sources=sources)
     return funcs, linenos
 
 
 if __name__ == '__main__':
+    path = '/home/gezhang/data/jupyter/target'
+    files = [f for f in os.listdir(path) if f.endswith('.py')]
+    frequency_map = {}
+    all_funcs = []
+    err_files = []
+    file2func = {}
 
-    files = [f for f in os.listdir(nb_path) if f.endswith('.py')]
-
-    for file in tqdm(files):
-        process_file(os.path.join(nb_path, file))
+    for f in tqdm(files):
+        try:
+            funcs, linenos = process_file(os.path.join(path, f))
+            print(funcs)
+        except Exception as e:
+            print(e)
