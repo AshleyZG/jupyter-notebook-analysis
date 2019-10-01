@@ -31,8 +31,10 @@ class Visitor(ast.NodeVisitor):
     def visit_Call(self, node):
         self.nest += 1
         func = self.process_func(node.func)
-
-        if func != None and self.nest == 1:
+        # if func != None:
+        #     print(func, node.lineno)
+        # if func != None and self.nest == 1:
+        if func != None:
             self.funcs.append(func)
             self.linenos.append(node.lineno)
 
@@ -119,7 +121,6 @@ def extract_funcs_from_py(file=None, sources=None):
     visitor.visit(tree)
 
     if visitor.funcs != []:
-
         funcs = visitor.funcs
         linenos = visitor.linenos
 
@@ -143,22 +144,15 @@ def process_file(file):
     with open(file, 'r') as f:
         sources = f.read()
     extract_module(sources=sources)
-
+    # pdb.set_trace()
     funcs, linenos = extract_funcs_from_py(sources=sources)
     return funcs, linenos
 
 
 if __name__ == '__main__':
-    path = '/home/gezhang/data/jupyter/target'
-    files = [f for f in os.listdir(path) if f.endswith('.py')]
-    frequency_map = {}
-    all_funcs = []
-    err_files = []
-    file2func = {}
-
-    for f in tqdm(files):
-        try:
-            funcs, linenos = process_file(os.path.join(path, f))
-            print(funcs)
-        except Exception as e:
-            print(e)
+    file = '/projects/bdata/jupyter/target/nb_451898.py'
+    funcs, linenos = process_file(file)
+    # print(funcs)
+    for f, l in zip(funcs, linenos):
+        print(f, l)
+    print('hello world')
