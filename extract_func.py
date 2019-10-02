@@ -11,6 +11,7 @@ import random
 import json
 from tqdm import tqdm
 import pdb
+import re
 
 from config import *
 
@@ -31,8 +32,7 @@ class Visitor(ast.NodeVisitor):
     def visit_Call(self, node):
         self.nest += 1
         func = self.process_func(node.func)
-        # if func != None:
-        #     print(func, node.lineno)
+
         # if func != None and self.nest == 1:
         if func != None:
             self.funcs.append(func)
@@ -68,6 +68,7 @@ class ModuleVisitor(ast.NodeVisitor):
         ast.NodeVisitor.generic_visit(self, node)
 
     def visit_Assign(self, node):
+
         if isinstance(node.value, ast.Call):
             for target in node.targets:
                 if isinstance(target, ast.Name):
@@ -112,9 +113,7 @@ def extract_funcs_from_py(file=None, sources=None):
     sources is file.read()
     must pass **sources**
     """
-    global module_map
-    # with open(file, 'r') as f:
-    #     sources = f.read()
+
     funcs = []
     linenos = []
     tree = ast.parse(sources)
@@ -124,8 +123,6 @@ def extract_funcs_from_py(file=None, sources=None):
         funcs = visitor.funcs
         linenos = visitor.linenos
 
-    visitor.reset_funcs()
-    module_map = {}
     return funcs, linenos
 
 
@@ -141,18 +138,43 @@ def extract_module(file=None, sources=None):
 
 
 def process_file(file):
+    global module_map
+
     with open(file, 'r') as f:
         sources = f.read()
-    extract_module(sources=sources)
-    # pdb.set_trace()
-    funcs, linenos = extract_funcs_from_py(sources=sources)
+
+    snippets = re.split(r"# In\[[\s0-9]+\]:", sources)
+
+    funcs = []
+    linenos = []
+    n_pre_lines = 0
+    for snippet in snippets:
+
+        extract_module(sources=snippet)
+
+        s_funcs, s_linenos = extract_funcs_from_py(sources=snippet)
+        s_linenos = [l + n_pre_lines for l in s_linenos]
+        funcs += s_funcs
+        linenos += s_linenos
+
+        visitor.reset_funcs()
+        n_pre_lines += len(snippet.split('\n')) - 1
+
+    module_map = {}
+
     return funcs, linenos
 
 
 if __name__ == '__main__':
-    file = '/projects/bdata/jupyter/target/nb_451898.py'
-    funcs, linenos = process_file(file)
+    files = ['/projects/bdata/jupyter/target/nb_812798.py',
+             '/projects/bdata/jupyter/target/nb_64845.py',
+             '/projects/bdata/jupyter/target/nb_64832.py']
+    for f in files:
+        print('-' * 20)
+        funcs, linenos = process_file(f)
     # print(funcs)
-    for f, l in zip(funcs, linenos):
-        print(f, l)
+        for f, l in zip(funcs, linenos):
+            if f.startswith('sklearn.'):
+                print(f, l)
+    # pdb.set_trace()
     print('hello world')
