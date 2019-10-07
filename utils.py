@@ -48,6 +48,10 @@ def split_func_name(func):
     for i, l in enumerate(func):
         if i > 0 and l.isupper() and func[i - 1].islower():
             new_str += '.'
+        elif i > 0 and i < len(func) - 1 and l.isupper() and func[i - 1].isupper() and func[i + 1].islower():
+            new_str += '.'
+        else:
+            pass
         new_str += l
     return re.split('\.|_', new_str.lower())
 
