@@ -9,6 +9,7 @@ import json
 from tqdm import tqdm
 from extract_func import process_file
 from config import nb_path
+import re
 
 
 def count_all_functions(out_path, notebooks=None):
@@ -37,6 +38,7 @@ def count_all_functions(out_path, notebooks=None):
         json.dump({"func_counter": func_counter,
                    "error_files": error_files}, fout, ensure_ascii=False, indent=2)
 
+
 def split_func_name(func):
     """
     split function names
@@ -44,10 +46,11 @@ def split_func_name(func):
     """
     new_str = ''
     for i, l in enumerate(func):
-        if i>0 and l.isupper() and func[i-1].islower():
-            new_str+='.'
-        new_str+=l
+        if i > 0 and l.isupper() and func[i - 1].islower():
+            new_str += '.'
+        new_str += l
     return re.split('\.|_', new_str.lower())
+
 
 if __name__ == '__main__':
 
