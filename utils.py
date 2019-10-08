@@ -58,7 +58,10 @@ def split_func_name(func):
             new_str += '.'
         elif i > 0 and i < len(func) - 1 and l.isupper() and func[i - 1].isupper() and func[i + 1].islower():
             new_str += '.'
-        # elif i > 0 and
+        elif i > 0 and l.isdigit() and func[i - 1].isalpha():
+            new_str += '.'
+        elif i < len(func) - 1 and l.isalpha() and func[i - 1].isdigit():
+            new_str += '.'
         else:
             pass
         new_str += l
