@@ -39,6 +39,14 @@ def count_all_functions(out_path, notebooks=None):
                    "error_files": error_files}, fout, ensure_ascii=False, indent=2)
 
 
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except:
+        return False
+
+
 def split_func_name(func):
     """
     split function names
@@ -50,6 +58,7 @@ def split_func_name(func):
             new_str += '.'
         elif i > 0 and i < len(func) - 1 and l.isupper() and func[i - 1].isupper() and func[i + 1].islower():
             new_str += '.'
+        # elif i > 0 and
         else:
             pass
         new_str += l
