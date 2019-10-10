@@ -8,8 +8,14 @@ import os
 import json
 from tqdm import tqdm
 from extract_func import process_file
-from config import nb_path
+from config import nb_path, key_libs
 import re
+
+DECISION_POINTS = {}
+
+for lib in key_libs:
+    with open('/projects/bdata/jupyter/decision_points/{}.txt'.format(lib), 'r') as f:
+        DECISION_POINTS[lib] = [l for l in f.read().split('\n') if l]
 
 
 def count_all_functions(out_path, notebooks=None):
@@ -68,25 +74,15 @@ def split_func_name(func):
     return re.split('\.|_', new_str.lower())
 
 
+def is_decision_point(func):
+    tokens = (func + '.').split('.')
+    if tokens[0] not in key_libs:
+        return False
+    lib = tokens[0]
+    if func in DECISION_POINTS[lib]:
+        return True
+    return False
+
+
 if __name__ == '__main__':
-
-    # with open('./py3_counter.txt', 'r') as f:
-    #     error_files = json.load(f)["error_files"]
-    # count_all_functions('./py2_counter.txt', error_files)
-    with open('./py2_counter.txt', 'r') as f:
-        data2 = json.load(f)
-    with open('./py3_counter.txt', 'r') as f:
-        data3 = json.load(f)
-    error_files = data2["error_files"]
-    func_counter = data2["func_counter"]
-    for f in data3["func_counter"]:
-        if f not in func_counter:
-            func_counter[f] = data3["func_counter"][f]
-        else:
-            func_counter[f] += data3["func_counter"][f]
-    with open('./func_counter.json', 'w') as fout:
-        json.dump({"func_counter": func_counter,
-                   "error_files": error_files}, fout, ensure_ascii=False, indent=2)
-    # notebooks = [f for f in os.listdir(nb_path) if f.endswith('.py')]
-
-    # count_all_functions('./py3_counter.txt', notebooks)
+    print(DECISION_POINTS)
