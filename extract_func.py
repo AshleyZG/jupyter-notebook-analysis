@@ -137,11 +137,14 @@ def extract_module(file=None, sources=None):
     mdvisitor.visit(tree)
 
 
-def process_file(file):
+def process_file(file, content=None):
     global module_map
 
-    with open(file, 'r') as f:
-        sources = f.read()
+    if content != None:
+        sources = content
+    else:
+        with open(file, 'r') as f:
+            sources = f.read()
 
     snippets = re.split(r"# In\[[\s0-9]+\]:", sources)
 
@@ -166,15 +169,22 @@ def process_file(file):
 
 
 if __name__ == '__main__':
-    files = ['/projects/bdata/jupyter/target/nb_812798.py',
-             '/projects/bdata/jupyter/target/nb_64845.py',
-             '/projects/bdata/jupyter/target/nb_64832.py']
-    for f in files:
-        print('-' * 20)
-        funcs, linenos = process_file(f)
-    # print(funcs)
-        for f, l in zip(funcs, linenos):
-            if f.startswith('sklearn.'):
-                print(f, l)
-    # pdb.set_trace()
-    print('hello world')
+
+    print(nb_path)
+    notebooks = [f for f in os.listdir(nb_path) if f.endswith('.py')]
+    results = {}
+    with open('file_funcs.json', 'r') as f:
+        results = json.load(f)
+    print(len(results))
+    pdb.set_trace()
+    for nb in tqdm(notebooks):
+        if nb in results:
+            continue
+        try:
+            funcs, linenos = process_file(os.path.join(nb_path, nb))
+            results[nb] = {"funcs": funcs,
+                           "linenos": linenos}
+        except:
+            pass
+    with open('file_funcs.json', 'w') as fout:
+        json.dump(results, fout, ensure_ascii=False, indent=2)
