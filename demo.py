@@ -9,6 +9,7 @@ import json
 # from ..jupyter - notebook - analysis.
 from extract_func import process_file
 from utils import is_decision_point
+from config import data_path
 
 UPLOAD_FOLDER = './myflask/uploaded_files'
 DATA_ROOT = '/projects/bdata/jupyter/target'
@@ -21,6 +22,10 @@ exporter = PythonExporter()
 app = Flask(__name__)
 # app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 *  1024 # set the maximize file size after which an upload is aborted
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+
+with open(os.path.join(data_path, 'alternatives.json'), 'r') as f:
+    alt = json.load(f)
 
 
 def allowed_file(filename):
@@ -87,8 +92,8 @@ def uploaded_file(filename):
     return render_template('content.html')
 
 
-@app.route('/local/<filename>')
-def open_local_file(filename):
+@app.route('/alt/<filename>')
+def open_alt_file(filename):
     if filename.endswith('.ipynb'):
         source = exporter.from_file(os.path.join(
             app.config['UPLOAD_FOLDER'], filename))[0]
@@ -106,17 +111,23 @@ def open_local_file(filename):
     for f, l in zip(funcs, linenos):
         print(f)
         if is_decision_point(f):
-            code_lines[l - 1] = '<span style="color:red">' + \
-                code_lines[l - 1].strip() + '</span>'
+            code_lines[l - 1] = '<span href="#" data-toggle="popover" data-html="true" style="color:red" title="Alternatives" data-content="{}">'.format(
+                '<br/>'.join(alt[f.split('.')[0]]["similar_sets"][alt[f.split('.')[0]]["func2set"][f]])) + code_lines[l - 1].strip() + '</span>'
+
     source = '\n'.join(code_lines)
     with open('./templates/my.html', 'w') as fout:
         fout.write(source)
-    return render_template('content.html')
+    return render_template('alt.html')
 
 
 @app.route('/render/<filename>')
 def render_html(filename):
     return render_template(filename)
+
+
+@app.route('/bootstrap')
+def bootstrap():
+    return render_template('bootstrap.html')
 
 
 if __name__ == '__main__':
