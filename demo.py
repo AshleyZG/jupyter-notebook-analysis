@@ -1,23 +1,25 @@
 import os
 from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
-from nbconvert import PythonExporter
+from nbconvert import PythonExporter, HTMLExporter
 
 
 import json
+from bs4 import BeautifulSoup
+
 
 # from ..jupyter - notebook - analysis.
 from extract_func import process_file
 from utils import is_decision_point
 from config import data_path
 
-UPLOAD_FOLDER = './myflask/uploaded_files'
+UPLOAD_FOLDER = './uploaded_files'
 DATA_ROOT = '/projects/bdata/jupyter/target'
 ALLOWED_EXTENSIONS = set(
     ['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'ipynb', 'html'])
 
-exporter = PythonExporter()
-
+py_exporter = PythonExporter()
+html_exporter = HTMLExporter()
 
 app = Flask(__name__)
 # app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 *  1024 # set the maximize file size after which an upload is aborted
@@ -26,6 +28,23 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 with open(os.path.join(data_path, 'alternatives.json'), 'r') as f:
     alt = json.load(f)
+
+
+def remove_output_from_html(content):
+    """
+    remove all output blocks from jupyter notebooks html
+    Parameters:
+    content: html string (content of original notebook html)
+    Returns:
+    new_content: html string without output blocks
+    """
+    soup = BeautifulSoup(content)
+
+    for tag in soup.find_all('div', class_='output_wrapper'):
+        tag.decompose()
+
+    new_content = soup.prettify()
+    return new_content
 
 
 def allowed_file(filename):
@@ -49,7 +68,7 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            return redirect(url_for('uploaded_file',
+            return redirect(url_for('remove_output',
                                     filename=filename))
     return '''
     <!doctype html>
@@ -68,7 +87,7 @@ from flask import send_from_directory
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     if filename.endswith('.ipynb'):
-        source = exporter.from_file(os.path.join(
+        source = py_exporter.from_file(os.path.join(
             app.config['UPLOAD_FOLDER'], filename))[0]
         with open(os.path.join(
                 app.config['UPLOAD_FOLDER'], filename.replace('.ipynb', '.py')), 'w') as fout:
@@ -95,29 +114,47 @@ def uploaded_file(filename):
 @app.route('/alt/<filename>')
 def open_alt_file(filename):
     if filename.endswith('.ipynb'):
-        source = exporter.from_file(os.path.join(
+        py_source = py_exporter.from_file(os.path.join(
             app.config['UPLOAD_FOLDER'], filename))[0]
+        html_source = html_exporter.from_file(os.path.join(
+            app.config['UPLOAD_FOLDER'], filename))[0]
+        html_source = remove_output_from_html(html_source)
         with open(os.path.join(
                 app.config['UPLOAD_FOLDER'], filename.replace('.ipynb', '.py')), 'w') as fout:
-            fout.write(source)
+            fout.write(py_source)
     elif filename.endswith('.py'):
         with open(os.path.join(
                 DATA_ROOT, filename), 'r') as f:
-            source = f.read()
+            py_source = f.read()
     else:
         raise ValueError('file must be ipynb or py scripts')
-    funcs, linenos = process_file('_', content=source)
-    code_lines = source.split('\n')
+    funcs, linenos = process_file('_', content=py_source)
+    code_lines = py_source.split('\n')
     for f, l in zip(funcs, linenos):
         print(f)
         if is_decision_point(f):
             code_lines[l - 1] = '<span href="#" data-toggle="popover" data-html="true" style="color:red" title="Alternatives" data-content="{}">'.format(
                 '<br/>'.join(alt[f.split('.')[0]]["similar_sets"][alt[f.split('.')[0]]["func2set"][f]])) + code_lines[l - 1].strip() + '</span>'
 
-    source = '\n'.join(code_lines)
+    py_source = '\n'.join(code_lines)
     with open('./templates/my.html', 'w') as fout:
-        fout.write(source)
-    return render_template('alt.html')
+        fout.write(html_source)
+    return render_template('content.html')
+
+
+@app.route('/remove_output/<filename>', methods=['GET'])
+def remove_output(filename):
+
+    if filename.endswith('.ipynb'):
+        html_source = html_exporter.from_file(os.path.join(
+            app.config['UPLOAD_FOLDER'], filename))[0]
+        html_source = remove_output_from_html(html_source)
+        print(filename)
+        with open('./templates/{}'.format(filename.replace('.ipynb', 'html')), 'w') as fout:
+            fout.write(html_source)
+    else:
+        pass
+    return render_template(filename.replace('.ipynb', 'html'))
 
 
 @app.route('/render/<filename>')

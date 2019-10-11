@@ -1,1 +1,281 @@
-<span style="color:red"> hello </span>
+
+# coding: utf-8
+
+# ## Load Libraries and Create Function
+
+# In[1]:
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.externals import joblib
+get_ipython().magic(u'matplotlib inline')
+
+
+# In[2]:
+
+
+class BinaryClassificationPerformance():
+    '''Performance measures to evaluate the fit of a binary classification model'''
+
+    def __init__(self, predictions, labels, desc, probabilities=None):
+        '''Initialize attributes: predictions-vector of predicted values for Y, labels-vector of labels for Y'''
+        '''probabilities-optional, probability that Y is equal to True'''
+        self.probabilities = probabilities
+        self.performance_df = pd.concat([pd.DataFrame(predictions), pd.DataFrame(labels)], axis=1)
+        self.performance_df.columns = ['preds', 'labls']
+        self.desc = desc
+        self.performance_measures = {}
+        self.image_indices = {}
+
+    def compute_measures(self):
+        '''Compute performance measures defined by Flach p. 57'''
+        self.performance_measures['Pos'] = self.performance_df['labls'].sum()
+        self.performance_measures['Neg'] = self.performance_df.shape[0] - self.performance_df['labls'].sum()
+        self.performance_measures['TP'] = ((self.performance_df['preds'] == True) & (self.performance_df['labls'] == True)).sum()
+        self.performance_measures['TN'] = ((self.performance_df['preds'] == False) & (self.performance_df['labls'] == False)).sum()
+        self.performance_measures['FP'] = ((self.performance_df['preds'] == True) & (self.performance_df['labls'] == False)).sum()
+        self.performance_measures['FN'] = ((self.performance_df['preds'] == False) & (self.performance_df['labls'] == True)).sum()
+        self.performance_measures['Accuracy'] = (self.performance_measures['TP'] + self.performance_measures['TN']) / (self.performance_measures['Pos'] + self.performance_measures['Neg'])
+        self.performance_measures['Precision'] = self.performance_measures['TP'] / (self.performance_measures['TP'] + self.performance_measures['FP'])
+        self.performance_measures['Recall'] = self.performance_measures['TP'] / self.performance_measures['Pos']
+
+    def img_indices(self):
+        '''Get the indices of true and false positives to be able to locate the corresponding images in a list of image names'''
+        self.performance_df['tp_ind'] = ((self.performance_df['preds'] == True) & (self.performance_df['labls'] == True))
+        self.performance_df['fp_ind'] = ((self.performance_df['preds'] == True) & (self.performance_df['labls'] == False))
+        self.image_indices['TP_indices'] = np.where(self.performance_df['tp_ind']==True)[0].tolist()
+        self.image_indices['FP_indices'] = np.where(self.performance_df['fp_ind']==True)[0].tolist()
+
+
+# In[3]:
+
+
+amazon = pd.read_csv('raw_data_train.csv', encoding ='latin-1')
+print(amazon.shape)
+
+
+# In[4]:
+
+
+print(amazon.head())
+print(amazon['helpful'].mean())
+
+
+# ## Feature Extraction from Natural Language Libraries
+
+# In[5]:
+
+
+# vectorize Bag of Words from review text; as sparse matrix
+from sklearn.feature_extraction.text import HashingVectorizer
+<span style="color:red">hv = HashingVectorizer(n_features=2 ** 17, non_negative=True)</span>
+X_hv = hv.fit_transform(amazon.Text)
+print(X_hv.shape)
+
+
+# In[6]:
+
+
+joblib.dump(hv, 'hv.pkl') # pickle
+
+
+# In[7]:
+
+
+from sklearn.feature_extraction.text import TfidfTransformer
+<span style="color:red">transformer = TfidfTransformer()</span>
+X_tfidf = transformer.fit_transform(X_hv)
+
+joblib.dump(transformer, 'transformer.pkl')
+
+
+# In[8]:
+
+
+print(type(X_tfidf))
+
+
+# ## Creating Additional Features
+
+# In[9]:
+
+
+import re
+from string import punctuation
+
+# length features
+amazon['reviewLen'] = amazon['Text'].str.len()
+amazon['profileLen'] = amazon['ProfileName'].str.len()
+amazon['summaryLen'] = amazon['Summary'].str.len()
+
+#count number of reviews made by the same reviewer
+amazon['commCount'] = amazon.groupby('ProfileName')['ProfileName'].transform('count')
+
+#Capital letter Features
+amazon['profileCaps'] = amazon['ProfileName'][(np.isnan(amazon['profileLen'])) == 0].apply(lambda x: len(re.findall("[A-Z]", x)))
+amazon['summaryCaps'] = amazon['Summary'][(np.isnan(amazon['summaryLen'])) == 0].apply(lambda x: len(re.findall("[A-Z]", x)))
+amazon['reviewCaps'] = amazon['Text'][(np.isnan(amazon['reviewLen'])) == 0].apply(lambda x: len(re.findall("[A-Z]", x)))
+
+#punctuation features
+amazon['profilePunc'] = amazon['ProfileName'][(np.isnan(amazon['profileLen'])) == 0].apply(lambda x: len(list(filter(lambda c: c in punctuation, x))))
+amazon['summaryPunc'] = amazon['Summary'][(np.isnan(amazon['summaryLen'])) == 0].apply(lambda x: len(list(filter(lambda c: c in punctuation, x))))
+amazon['reviewPunc'] = amazon['Text'][(np.isnan(amazon['reviewLen'])) == 0].apply(lambda x: len(list(filter(lambda c: c in punctuation, x))))
+
+#convert NaN's to 0
+amazon['profileLen'][(np.isnan(amazon['profileLen']))] = 0
+amazon['summaryLen'][(np.isnan(amazon['summaryLen']))] = 0
+amazon['reviewLen'][(np.isnan(amazon['reviewLen']))] = 0
+amazon['commCount'][(np.isnan(amazon['commCount']))] = 0
+amazon['profileCaps'][(np.isnan(amazon['profileCaps']))] = 0
+amazon['summaryCaps'][(np.isnan(amazon['summaryCaps']))] = 0
+amazon['reviewCaps'][(np.isnan(amazon['reviewCaps']))] = 0
+amazon['profilePunc'][(np.isnan(amazon['profilePunc']))] = 0
+amazon['summaryPunc'][(np.isnan(amazon['summaryPunc']))] = 0
+amazon['reviewPunc'][(np.isnan(amazon['reviewPunc']))] = 0
+
+#Interactions
+amazon['score_count'] = amazon['Score']*amazon['commCount']
+amazon['len_count'] = amazon['reviewLen']*amazon['commCount']
+amazon['score_len'] = amazon['Score']*amazon['reviewLen']
+
+X_quant_features = amazon[['Score', 'reviewLen', 'Time', 'summaryLen', 'commCount', 'profileCaps', 'profileLen',
+                            'summaryCaps', 'reviewCaps', 'profilePunc', 'summaryPunc', 'reviewPunc', 'score_count', 'len_count', 'score_len']]
+print(X_quant_features.head(10))
+print(type(X_quant_features))
+
+
+# In[10]:
+
+
+from scipy.sparse import csr_matrix, hstack
+<span style="color:red">X_quant_features_csr = csr_matrix(X_quant_features)</span>
+<select name= colour method="GET" action="/">
+    {% for colour in colour %}
+    <option value= "{{colour}}" SELECTED>{{colour}}</option>"
+    {% endfor %}
+</select>
+<span style="color:red">X_combined = hstack([X_tfidf, X_quant_features_csr])</span>
+<span style="color:red">X_matrix = csr_matrix(X_combined) # convert to sparse matrix</span>
+print(X_matrix.shape)
+
+
+# In[11]:
+
+
+# feature scaling
+from sklearn.preprocessing import StandardScaler
+<span style="color:red">sc = StandardScaler(with_mean=False)</span>
+X = sc.fit_transform(X_matrix)
+print(X.shape)
+
+joblib.dump(sc, 'sc.pkl') # pickle
+
+
+# In[12]:
+
+
+y = amazon['helpful'].values
+print(type(y))
+
+
+# ## Create Models
+
+# In[13]:
+
+
+from sklearn import linear_model
+<span style="color:red">svm = linear_model.SGDClassifier()</span>
+svm.fit(X, y)
+joblib.dump(svm, 'svm.pkl') # pickle
+
+svm_performance = BinaryClassificationPerformance(svm.predict(X), y, 'svm')
+svm_performance.compute_measures()
+print(svm_performance.performance_measures)
+
+
+# In[14]:
+
+
+from sklearn import linear_model
+<span style="color:red">lgs = linear_model.SGDClassifier(loss='log', n_iter=50, alpha=0.00001)</span>
+lgs.fit(X, y)
+joblib.dump(lgs, 'lgs.pkl') # pickle
+
+lgs_performance = BinaryClassificationPerformance(lgs.predict(X), y, 'lgs')
+lgs_performance.compute_measures()
+print(lgs_performance.performance_measures)
+
+
+# In[15]:
+
+
+from sklearn.naive_bayes import MultinomialNB
+<span style="color:red">nbs = MultinomialNB()</span>
+nbs.fit(X, y)
+joblib.dump(nbs, 'nbs.pkl') # pickle
+
+nbs_performance = BinaryClassificationPerformance(nbs.predict(X), y, 'nbs')
+nbs_performance.compute_measures()
+print(nbs_performance.performance_measures)
+
+
+# In[16]:
+
+
+# MODEL: Ridge Regression Classifier
+from sklearn import linear_model
+<span style="color:red">rdg = linear_model.RidgeClassifier()</span>
+rdg.fit(X, y)
+joblib.dump(rdg, 'rdg.pkl') # pickle
+
+rdg_performance = BinaryClassificationPerformance(rdg.predict(X), y, 'rdg')
+rdg_performance.compute_measures()
+print(rdg_performance.performance_measures)
+
+
+# In[17]:
+
+
+# MODEL: Perceptron
+from sklearn import linear_model
+<span style="color:red">prc = linear_model.SGDClassifier(loss='perceptron')</span>
+prc.fit(X, y)
+joblib.dump(prc, 'prc.pkl') # pickle
+
+prc_performance = BinaryClassificationPerformance(prc.predict(X), y, 'prc')
+prc_performance.compute_measures()
+print(prc_performance.performance_measures)
+
+
+# In[20]:
+
+
+# MODEL: Multi-layer Perceptron aka neural network
+from sklearn import neural_network
+<span style="color:red">nn = neural_network.MLPClassifier(hidden_layer_sizes = (1000))</span>
+nn.fit(X, y)
+joblib.dump(nn, 'nn.pkl') # pickle
+
+nn_performance = BinaryClassificationPerformance(nn.predict(X), y, 'nn')
+nn_performance.compute_measures()
+print(nn_performance.performance_measures)
+
+
+# In[19]:
+
+
+fits = [svm_performance, lgs_performance, nbs_performance, rdg_performance, prc_performance, nn_performance]
+
+for fit in fits:
+    plt.plot(fit.performance_measures['FP'] / fit.performance_measures['Neg'],
+             fit.performance_measures['TP'] / fit.performance_measures['Pos'], 'ro')
+    plt.text(fit.performance_measures['FP'] / fit.performance_measures['Neg'],
+             fit.performance_measures['TP'] / fit.performance_measures['Pos'], fit.desc)
+plt.axis([0, 1, 0, 1])
+plt.title('ROC plot: training set')
+plt.xlabel('False positive rate')
+plt.ylabel('True positive rate')
+plt.show()
+
