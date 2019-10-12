@@ -1,6 +1,11 @@
 # encoding=utf-8
 
-nb_path = '/home/gezhang/data/jupyter/target'
+import os
+
+data_path = '/projects/bdata/jupyter'
+# nb_path = '/home/gws/gezhang/data/jupyter/target'
+nb_path = '/projects/bdata/jupyter/target'
+
 toy_path = '/home/gezhang/data/jupyter/toy'
 key_methods_path = './key_methods.json'
 # import_path = '/data/nfsdata/zhangge/data/sample_data/data/import_nbs'
