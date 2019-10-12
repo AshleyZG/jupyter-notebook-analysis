@@ -12,7 +12,7 @@ import html2text
 from extract_func import process_file
 from utils import is_decision_point
 from config import data_path
-from constants import bootstrap_script
+from constants import bootstrap_script, popover_script
 
 UPLOAD_FOLDER = './uploaded_files'
 DATA_ROOT = '/projects/bdata/jupyter/target'
@@ -101,65 +101,6 @@ def upload_file():
 from flask import send_from_directory
 
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    if filename.endswith('.ipynb'):
-        source = py_exporter.from_file(os.path.join(
-            app.config['UPLOAD_FOLDER'], filename))[0]
-        with open(os.path.join(
-                app.config['UPLOAD_FOLDER'], filename.replace('.ipynb', '.py')), 'w') as fout:
-            fout.write(source)
-    elif filename.endswith('.py'):
-        with open(os.path.join(
-                app.config['UPLOAD_FOLDER'], filename), 'r') as f:
-            source = f.read()
-    else:
-        raise ValueError('file must be ipynb or py scripts')
-    funcs, linenos = process_file('_', content=source)
-    code_lines = source.split('\n')
-    for f, l in zip(funcs, linenos):
-        print(f)
-        if is_decision_point(f):
-            code_lines[l - 1] = '<span style="color:red">' + \
-                code_lines[l - 1].strip() + '</span>'
-    source = '\n'.join(code_lines)
-    with open('./templates/my.html', 'w') as fout:
-        fout.write(source)
-    return render_template('content.html')
-
-
-@app.route('/alt/<filename>')
-def open_alt_file(filename):
-    if filename.endswith('.ipynb'):
-        py_source = py_exporter.from_file(os.path.join(
-            app.config['UPLOAD_FOLDER'], filename))[0]
-        html_source = html_exporter.from_file(os.path.join(
-            app.config['UPLOAD_FOLDER'], filename))[0]
-        html_source = remove_output_from_html(html_source)
-
-        with open(os.path.join(
-                app.config['UPLOAD_FOLDER'], filename.replace('.ipynb', '.py')), 'w') as fout:
-            fout.write(py_source)
-    elif filename.endswith('.py'):
-        with open(os.path.join(
-                DATA_ROOT, filename), 'r') as f:
-            py_source = f.read()
-    else:
-        raise ValueError('file must be ipynb or py scripts')
-    funcs, linenos = process_file('_', content=py_source)
-    code_lines = py_source.split('\n')
-    for f, l in zip(funcs, linenos):
-        print(f)
-        if is_decision_point(f):
-            code_lines[l - 1] = '<span href="#" data-toggle="popover" data-html="true" style="color:red" title="Alternatives" data-content="{}">'.format(
-                '<br/>'.join(alt[f.split('.')[0]]["similar_sets"][alt[f.split('.')[0]]["func2set"][f]])) + code_lines[l - 1].strip() + '</span>'
-
-    py_source = '\n'.join(code_lines)
-    with open('./templates/my.html', 'w') as fout:
-        fout.write(html_source)
-    return render_template('content.html')
-
-
 @app.route('/remove_output/<filename>')
 def remove_output(filename):
 
@@ -174,8 +115,7 @@ def remove_output(filename):
         html_source = html_source.replace('.popover {\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 1060;\n  display: none;',
                                           '.popover {\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 1060;\n  display: block;')
         html_source = html_source.replace(
-            '</html>', '  <script>\n   $(function () {\n       $(\'[data-toggle="popover"]\').popover()\n           container:\'body\'\n             })\n  </script></html>')
-        # print(html_source)
+            '</html>', popover_script + '</html>')
         py_source = py_exporter.from_file(os.path.join(
             app.config['UPLOAD_FOLDER'], filename))[0]
         soup = BeautifulSoup(html_source)
@@ -196,7 +136,7 @@ def remove_output(filename):
                             new_element.string = f.split('.')[-1]
                             new_element["data-toggle"] = "popover"
                             new_element["data-html"] = "true"
-                            new_element["style"] = "background-color:#FEDFE1;"
+                            new_element["style"] = "background-color:#BEC23F;"
                             new_element["title"] = "Alternatives"
                             new_element["data-content"] = "{}".format(
                                 '<br/>'.join(alt[f.split('.')[0]]["similar_sets"][alt[f.split('.')[0]]["func2set"][f]]))
