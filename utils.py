@@ -10,6 +10,7 @@ from tqdm import tqdm
 from extract_func import process_file
 from config import nb_path, key_libs
 import re
+import urllib.request
 
 DECISION_POINTS = {}
 
@@ -82,6 +83,13 @@ def is_decision_point(func):
     if func in DECISION_POINTS[lib]:
         return True
     return False
+
+
+def download_from_url(url, save_dir=""):
+    filename = url.split('/')[-1]
+    urllib.request.urlretrieve(url, os.path.join(save_dir, filename))
+    return filename
+    # raise NotImplementedError
 
 
 if __name__ == '__main__':
