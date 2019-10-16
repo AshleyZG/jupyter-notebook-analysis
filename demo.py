@@ -2,15 +2,17 @@ import os
 from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
 from nbconvert import PythonExporter, HTMLExporter
-
+import shutil
 
 import json
 from bs4 import BeautifulSoup, Tag
 import html2text
+from flask import send_from_directory
+import pdb
 
 # from ..jupyter - notebook - analysis.
 from extract_func import process_file
-from utils import is_decision_point
+from utils import is_decision_point, download_from_url
 from config import data_path
 from constants import bootstrap_script, popover_script
 
@@ -30,6 +32,24 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 with open(os.path.join(data_path, 'alternatives.json'), 'r') as f:
     alt = json.load(f)
+
+
+def is_target_element(element, target_line):
+    pre_string = ''
+    post_string = ''
+    cur_element = element.previous_sibling
+    # add pre string
+    while '\n' not in cur_element.string and cur_element.string != '':
+        pre_string = cur_element.string + pre_string
+        cur_element = cur_element.previous_sibling
+    cur_element = element.next_sibling
+    # add post string
+    while '\n' not in cur_element.string and cur_element.string != '':
+        post_string = post_string + cur_element.string
+        cur_element = cur_element.next_sibling
+    code_line = pre_string + element.string + post_string
+    return code_line.strip() == target_line.strip()
+    # raise NotImplementedError
 
 
 def remove_script(content):
@@ -73,6 +93,13 @@ def allowed_file(filename):
 def upload_file():
     if request.method == 'POST':
         # check if the post request has the file part
+        print(request.form)
+        if 'text' in request.form:
+            # raise NotImplementedError
+            print(request.form["text"])
+            url = request.form["text"]
+            filename = download_from_url(url, app.config['UPLOAD_FOLDER'])
+            return redirect(url_for('remove_output', filename=filename))
         if 'file' not in request.files:
             flash('No file part')
             return redirect(request.url)
@@ -90,15 +117,32 @@ def upload_file():
     return '''
     <!doctype html>
     <title>Upload new File</title>
+    <a href="../static/README.pdf">README</a>
     <h1>Upload new File</h1>
     <form method=post enctype=multipart/form-data>
       <input type=file name=file>
       <input type=submit value=Upload>
     </form>
+    or
+    <form method=post>
+    <input name=text>
+    <input type=submit>
+</form>
     '''
 
 
-from flask import send_from_directory
+@app.route('/github')
+def upload_github_url():
+    raise NotImplementedError
+
+
+@app.route('/local/<filename>')
+def load_local_file(filename):
+    shutil.copyfile(os.path.join(
+        '/projects/bdata/jupyter/filtered_notebook', filename), os.path.join(
+            app.config['UPLOAD_FOLDER'], filename))
+    return redirect(url_for('remove_output',
+                            filename=filename))
 
 
 @app.route('/remove_output/<filename>')
@@ -124,14 +168,21 @@ def remove_output(filename):
         index = 0
         for f, l in zip(funcs, linenos):
             if is_decision_point(f):
+                print(f)
+                # if f == 'sklearn.linear_model.LinearRegression':
                 target_line = code_lines[l - 1]
                 for i, tag in enumerate(soup.find_all('div', class_='input_area')[index:]):
                     input_content = html_text_exporter.handle(tag.prettify())
                     input_lines = input_content.strip().split('\n')
                     match = False
                     for il in input_lines:
-                        if il == target_line:
-                            element = tag.find('span', text=f.split('.')[-1])
+                        if il.strip() == target_line.strip():
+                            elements = tag.find_all(
+                                'span', text=f.split('.')[-1])
+                            for e in elements:
+                                if is_target_element(e, target_line):
+                                    element = e
+                                    break
                             new_element = soup.new_tag('button')
                             new_element.string = f.split('.')[-1]
                             new_element["data-toggle"] = "popover"
@@ -165,9 +216,9 @@ def bootstrap():
     return render_template('bootstrap.html')
 
 
-@app.route('/temp')
+@app.route('/readme')
 def temp():
-    return render_template('similar_sets.html')
+    return render_template('readme.html')
 
 
 if __name__ == '__main__':
