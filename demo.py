@@ -3,6 +3,12 @@ from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
 from nbconvert import PythonExporter, HTMLExporter
 import shutil
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField, FileField, SubmitField
+from flask_wtf.file import FileRequired, FileAllowed
+
+from wtforms.validators import DataRequired
+from flask_mail import Message, Mail
 
 import json
 from bs4 import BeautifulSoup, Tag
@@ -29,27 +35,44 @@ app = Flask(__name__)
 # app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 *  1024 # set the maximize file size after which an upload is aborted
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+app.config.update(dict(
+    DEBUG=True,
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USE_SSL=False,
+    MAIL_USERNAME='gsarazh@gmail.com',
+    MAIL_PASSWORD='zg245678',
+    MAIL_DEFAULT_SENDER='Ge Zhang <gsarazh@gmail.com>'
+))
+
+mail = Mail(app)
 
 with open(os.path.join(data_path, 'alternatives.json'), 'r') as f:
     alt = json.load(f)
+
+
+class MyForm(FlaskForm):
+    email = StringField('email', validators=[DataRequired()])
+    feedback = TextAreaField('feedback', validators=[DataRequired()])
+    file = FileField('file', validators=[
+                     FileRequired(), FileAllowed(["py", "ipynb", "pdf"])])
+    # submit = SubmitField('Sign In')
 
 
 def is_target_element(element, target_line):
     pre_string = ''
     post_string = ''
     cur_element = element.previous_sibling
-    # add pre string
-    while '\n' not in cur_element.string and cur_element.string != '':
+    while cur_element.string is not None and '\n' not in cur_element.string:
         pre_string = cur_element.string + pre_string
         cur_element = cur_element.previous_sibling
     cur_element = element.next_sibling
-    # add post string
-    while '\n' not in cur_element.string and cur_element.string != '':
+    while '\n' not in cur_element.string and cur_element.string is not None:
         post_string = post_string + cur_element.string
         cur_element = cur_element.next_sibling
     code_line = pre_string + element.string + post_string
     return code_line.strip() == target_line.strip()
-    # raise NotImplementedError
 
 
 def remove_script(content):
@@ -118,6 +141,7 @@ def upload_file():
     <!doctype html>
     <title>Upload new File</title>
     <a href="../static/README.pdf">README</a>
+    <a href="/feedback">Feedback</a>
     <h1>Upload new File</h1>
     <form method=post enctype=multipart/form-data>
       <input type=file name=file>
@@ -131,9 +155,27 @@ def upload_file():
     '''
 
 
-@app.route('/github')
-def upload_github_url():
-    raise NotImplementedError
+@app.route('/feedback', methods=["POST", "GET"])
+def feedback():
+    form = MyForm()
+    if form.validate_on_submit():
+        if '@' not in form.data['email']:
+            return redirect('/feedback')
+        else:
+            print(form.file.data)
+            filename = form.file.data.filename
+            msg = Message("feedback of jupyter notebook analyses",
+                          recipients=["gezhang@cs.washington.edu"])
+            msg.body = '''[From] {}\n\n[Feedback] {}'''.format(
+                form.email.data, form.feedback.data)
+            form.file.data.save(os.path.join(
+                app.config['UPLOAD_FOLDER'], filename))
+            with open(os.path.join(
+                    app.config['UPLOAD_FOLDER'], filename), 'r') as f:
+                msg.attach(filename, 'application/x-ipynb+json', data=f.read())
+            mail.send(msg)
+            return '<h3>Sended  email to U! ^^</h3>'
+    return render_template('submit.html', form=form)
 
 
 @app.route('/local/<filename>')
@@ -223,5 +265,7 @@ def temp():
 
 if __name__ == '__main__':
     host = '0.0.0.0'
+    app.secret_key = 'super secret key'
+
     debug = True
     app.run(host=host, debug=debug)
