@@ -1,7 +1,23 @@
 # jupyter-notebook-analysis
 analysis for jupyter notebooks  
 
+## First Thing
+
+```python
+cd jupyter-notebook-analysis
+export PYTHONPATH=./
+```
+
+## Run Demo
+
+```python
+python3 demo.py
+```
+
+main function: `remove_output`
+
 ## Data
+
 `/home/gezhang/data/jupyter/target` python files which import 'statsmodels', 'gensim', 'keras', 'sklearn', 'xgboost'  
 `/home/gezhang/jupyter-notebook-analysis/func_tokens.txt` all functions from target pys. split by '.' '\_'. used for word2vec.  
 `/home/gezhang/jupyter-notebook-analysis/graphs.txt` window_size=1 graphs  
@@ -10,6 +26,7 @@ analysis for jupyter notebooks
 `/home/gezhang/jupyter-notebook-analysis/graphs_last_token.txt` graphs window_size=1 , use last token as target  
 `/home/gezhang/jupyter-notebook-analysis/toy_funcs_graph.txt` graphs functions list (toy )  
 `/home/gezhang/jupyter-notebook-analysis/funcs_graph.txt` graphs functions list   
+
 ## Vocab
 `/home/gezhang/graph-based-code-modelling/Models/vocab_window_1.json` window size=1 all graphs (cg 60000, tg 10000)  
 `/home/gezhang/graph-based-code-modelling/Models/vocab_window_1_large.json` window size=1 all graphs (cg 65274, tg 19079)
@@ -28,12 +45,4 @@ analysis for jupyter notebooks
 ## Log
 `/home/gezhang/jupyter-notebook-analysis/nobs_similars.txt` 13832 functions occur more than 10 (all 110000 funcs)
 `/home/gezhang/graph-based-code-modelling/Models/last_token_test_alternatives.txt` last token single token test alternatives
-
-## Run Demo
-
-```python
-python3 demo.py
-```
-
-main function: `remove_output`
 
