@@ -1,0 +1,8 @@
+<form method="POST" action="/feedback" enctype="multipart/form-data">
+    {{ form.csrf_token }}
+     {{ form.hidden_tag() }}
+    {{ form.email.label }} {{ form.email(size=20) }}
+    {{ form.feedback.label }} {{ form.feedback(size=200) }}
+    {{ form.file }}
+    <input type="submit" value="Go">
+</form>
