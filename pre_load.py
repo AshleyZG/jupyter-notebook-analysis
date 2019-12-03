@@ -10,5 +10,5 @@ import json
 from config import key_methods_path
 
 
-with open(key_methods_path, 'r') as f:
-    key_methods = json.load(f)
+# with open(key_methods_path, 'r') as f:
+#     key_methods = json.load(f)

@@ -138,20 +138,21 @@ def upload_file():
             return redirect(url_for('remove_output',
                                     filename=filename))
     return '''
-    <!doctype html>
+    <html lang="en">
     <title>Upload new File</title>
     <a href="../static/README.pdf">README</a>
     <a href="/feedback">Feedback</a>
     <h1>Upload new File</h1>
     <form method=post enctype=multipart/form-data>
-      <input type=file name=file>
-      <input type=submit value=Upload>
+      <input type=file name=file >
+      <input type=submit value="Upload">
     </form>
     or
     <form method=post>
     <input name=text>
     <input type=submit>
 </form>
+</html>
     '''
 
 
@@ -189,29 +190,38 @@ def load_local_file(filename):
 
 @app.route('/remove_output/<filename>')
 def remove_output(filename):
-
     if filename.endswith('.ipynb'):
+        # convert ipynb to html
         html_source = html_exporter.from_file(os.path.join(
             app.config['UPLOAD_FOLDER'], filename))[0]
+        # remove cell output
         html_source = remove_output_from_html(html_source)
+        # remove some html codes so that we can add our own elements
+        # I'm not sure about why but it works
         html_source = remove_script(html_source)
+        # manually import "boostrap" things
         html_source = bootstrap_script + html_source
+        # modify opacity so that our own elements are visible
         html_source = html_source.replace('.fade {\n  opacity: 0;',
                                           '.fade {\n  opacity: 90;')
         html_source = html_source.replace('.popover {\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 1060;\n  display: none;',
                                           '.popover {\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 1060;\n  display: block;')
+        # add popover function at the bottom of html
         html_source = html_source.replace(
             '</html>', popover_script + '</html>')
+        # convert ipynb to py
         py_source = py_exporter.from_file(os.path.join(
             app.config['UPLOAD_FOLDER'], filename))[0]
+
         soup = BeautifulSoup(html_source)
+        # find decision points and their line numbers
         funcs, linenos = process_file('_', content=py_source)
         code_lines = py_source.split('\n')
         index = 0
+        # highlight decision points and add popover windows
         for f, l in zip(funcs, linenos):
             if is_decision_point(f):
                 print(f)
-                # if f == 'sklearn.linear_model.LinearRegression':
                 target_line = code_lines[l - 1]
                 for i, tag in enumerate(soup.find_all('div', class_='input_area')[index:]):
                     input_content = html_text_exporter.handle(tag.prettify())
@@ -241,11 +251,17 @@ def remove_output(filename):
                         break
 
         html_source = soup.prettify()
+
+        # dump new html
         with open('./templates/{}'.format(filename.replace('.ipynb', '.html')), 'w') as fout:
             fout.write(html_source)
     else:
+        # file not ends with ".ipynb"
         pass
     return render_template(filename.replace('.ipynb', '.html'))
+
+
+# ======== Unimportant functions ===========
 
 
 @app.route('/render/<filename>')
@@ -261,6 +277,7 @@ def bootstrap():
 @app.route('/readme')
 def temp():
     return render_template('readme.html')
+# ==========================================
 
 
 if __name__ == '__main__':

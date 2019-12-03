@@ -3,20 +3,20 @@ import re
 import json
 import random
 import pdb
-
+from .parse_python import parse_snippet
 from constants import HOLE
-from extract_func import extract_funcs_from_code
+# from extract_func import extract_funcs_from_code
 
 
-TARGET_TOKENS = []
-with open('./decision_points.txt', 'r') as f:
-    for l in f:
-        if l.strip()[-1] == '0':
-            continue
-        func = l.split('\t')[0]
-        tokens = func.split('.')[1:]
-        TARGET_TOKENS += tokens
-TARGET_TOKENS = list(set(TARGET_TOKENS))
+# TARGET_TOKENS = []
+# with open('./decision_points.txt', 'r') as f:
+#     for l in f:
+#         if l.strip()[-1] == '0':
+#             continue
+#         func = l.split('\t')[0]
+#         tokens = func.split('.')[1:]
+#         TARGET_TOKENS += tokens
+# TARGET_TOKENS = list(set(TARGET_TOKENS))
 
 
 class Graph(object):
@@ -39,9 +39,12 @@ class Graph(object):
         self.target_tokens = None
         self.context = ''.join([astunparse.unparse(node)
                                 for node in ast_nodes])
+        return
+
         self.build_graph(ast_nodes)
         self.add_next_token()
         self.add_last_token_used()
+        # return
         if single_token:
             self.new_replace_target()
         elif only_func:
@@ -51,6 +54,11 @@ class Graph(object):
         # pdb.set_trace()
         self.split_original_expression(single_token, only_func)
         # pdb.set_trace()
+
+    def parse_snippet(self, snippet):
+        nodes = parse_snippet(snippet)
+        return nodes
+        raise NotImplementedError
 
     def build_graph(self, ast_nodes):
         '只构建 child 边'
@@ -323,3 +331,76 @@ class Graph(object):
                 token_lst.append(self.original_expression[i])
             i += len(token_lst[-1])
         self.target_tokens = token_lst
+
+
+# class NewGraph(Graph):
+#     """docstring for NewGraph"""
+
+#     def __init__(self, arg):
+#         super(NewGraph, self).__init__()
+#         self.arg = arg
+
+class MetaGraph(object):
+    """docstring for MetaGraph"""
+
+    def __init__(self, ast_nodes, target_lineno, target_node, file, target_func, funcs=None):
+        super(MetaGraph, self).__init__()
+        # self.arg = arg
+        self.target_lineno = target_lineno
+        self.target_node = target_node
+        self.target_func = target_func
+        self.file = file
+        self.funcs = funcs
+        self.custom_labels = []
+        self.edges = {}
+        self.target_root = None
+        self.original_expression = None
+        self.target_set = None
+        self.target_tokens = None
+        self.context = ''.join([astunparse.unparse(node)
+                                for node in ast_nodes])
+        self.nodes = self.parse_snippet()
+
+    def __len__(self):
+        return len(self.nodes)
+
+    def get_metadata(self):
+        """
+        return json string of a graph, containing all metadata
+        """
+        # pdb.set_trace()
+        metadata = {"target_lineno": self.target_lineno,
+                    "file": self.file,
+                    "context": self.context,
+                    "target_func": self.target_func,
+                    "nodes": self.nodes,
+                    "funcs": self.funcs}
+        # raise NotImplementedError
+        return metadata
+
+    def dump_into_file(self, out_path, merge=False):
+        '''
+        Dump the graph of a program into a file
+        -------------------------------
+        param:
+        out_path: where to dump the graph
+        '''
+        metadata = self.get_metadata()
+        if merge:
+            with open(out_path, 'a') as fout:
+                fout.write(json.dumps(metadata, ensure_ascii=False))
+                fout.write('\n')
+
+        else:
+            with open(out_path, 'w') as fout:
+                fout.write(json.dumps(metadata, ensure_ascii=False, indent=2))
+
+    def parse_snippet(self):
+        nodes = json.loads(parse_snippet(self.context))
+
+        assert isinstance(nodes, list)
+        # print('-'*20)
+        # print(self.context)
+        # print(nodes)
+        # print(len(nodes))
+        return nodes

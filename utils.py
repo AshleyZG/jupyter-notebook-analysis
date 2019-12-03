@@ -92,5 +92,11 @@ def download_from_url(url, save_dir=""):
     # raise NotImplementedError
 
 
+def cut_cells_from_py(filename):
+    with open(filename, 'r',encoding='utf-8') as f:
+        sources = f.read()
+    return re.split(r"# In\[[\s0-9]+\]:", sources)
+
+
 if __name__ == '__main__':
     print(DECISION_POINTS)
