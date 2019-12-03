@@ -28,3 +28,12 @@ analysis for jupyter notebooks
 ## Log
 `/home/gezhang/jupyter-notebook-analysis/nobs_similars.txt` 13832 functions occur more than 10 (all 110000 funcs)
 `/home/gezhang/graph-based-code-modelling/Models/last_token_test_alternatives.txt` last token single token test alternatives
+
+## Run Demo
+
+```python
+python3 demo.py
+```
+
+main function: `remove_output`
+
