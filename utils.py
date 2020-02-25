@@ -10,7 +10,13 @@ from tqdm import tqdm
 from extract_func import process_file
 from config import nb_path, key_libs
 import re
-import urllib.request
+# import urllib.request
+from nbconvert import PythonExporter, HTMLExporter
+import pdb
+from bs4 import BeautifulSoup
+
+py_exporter = PythonExporter()
+
 
 DECISION_POINTS = {}
 
@@ -93,10 +99,42 @@ def download_from_url(url, save_dir=""):
 
 
 def cut_cells_from_py(filename):
-    with open(filename, 'r',encoding='utf-8') as f:
+    # with open(filename, 'r', encoding='utf-8') as f:
+    with open(filename, 'r') as f:
         sources = f.read()
     return re.split(r"# In\[[\s0-9]+\]:", sources)
 
 
+def cut_cells_from_py_source(sources):
+    return re.split(r"# In\[[\s0-9]+\]:", sources)
+
+
+def ipynb2py(filename):
+    py_source = py_exporter.from_file(filename)[0]
+    py_filename = filename.replace('.ipynb', '.py')
+    with open(py_filename, 'w') as fout:
+        fout.write(py_source)
+    return py_filename
+
+
+def get_cell_labels_from_html(html_source):
+    soup = BeautifulSoup(html_source)
+    cells = soup.find_all("div", class_="inner_cell")
+    stages = []
+    for cell in cells:
+        labeled_option = cell.find('option', {'selected': True})
+        # stage = labeled_option["value"]
+        stages.append(labeled_option["value"])
+        # pdb.set_trace()
+    return stages
+
+    # raise NotImplementedError
+
+
 if __name__ == '__main__':
-    print(DECISION_POINTS)
+    # print(DECISION_POINTS)
+    py_source = py_exporter.from_file(
+        '/projects/bdata/jupyter/_7_1/nb_1166597.ipynb')[0]
+    cells = cut_cells_from_py_source(py_source)
+    pdb.set_trace()
+    cells = cut_cells_from_py('/projects/bdata/jupyter/_7_1/nb_1166597.ipynb')
