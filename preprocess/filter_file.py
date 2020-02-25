@@ -49,6 +49,8 @@ def select_data_science_py(dir_path, aim_path, max_num_files=None):
         shutil.copy(os.path.join(dir_path, file), os.path.join(aim_path, file))
 
 
+# def is_data_science_nb
+
 if __name__ == '__main__':
 
     select_data_science_py(
