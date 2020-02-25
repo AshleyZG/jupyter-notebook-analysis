@@ -1,9 +1,15 @@
+# coding=utf-8
+# created by Ge Zhang, 2019
+#
+# graph data structure
+# please use MetaGraph
+
 import astunparse
 import re
 import json
 import random
 import pdb
-from .parse_python import parse_snippet
+from parse_python2 import parse_snippet
 from constants import HOLE
 # from extract_func import extract_funcs_from_code
 
@@ -343,7 +349,7 @@ class Graph(object):
 class MetaGraph(object):
     """docstring for MetaGraph"""
 
-    def __init__(self, ast_nodes, target_lineno, target_node, file, target_func, funcs=None):
+    def __init__(self, ast_nodes, target_lineno, target_node, file, target_func, funcs=None, stage=None, annotation=None, id_=None, header=None, neighbor_cells=None):
         super(MetaGraph, self).__init__()
         # self.arg = arg
         self.target_lineno = target_lineno
@@ -351,12 +357,18 @@ class MetaGraph(object):
         self.target_func = target_func
         self.file = file
         self.funcs = funcs
+        self.stage = stage
+        self.annotation = annotation
+        self.neighbor_cells = neighbor_cells
+        self.id = id_
+        self.header = header
         self.custom_labels = []
         self.edges = {}
         self.target_root = None
         self.original_expression = None
         self.target_set = None
         self.target_tokens = None
+
         self.context = ''.join([astunparse.unparse(node)
                                 for node in ast_nodes])
         self.nodes = self.parse_snippet()
@@ -374,7 +386,12 @@ class MetaGraph(object):
                     "context": self.context,
                     "target_func": self.target_func,
                     "nodes": self.nodes,
-                    "funcs": self.funcs}
+                    "funcs": self.funcs,
+                    "stage": self.stage,
+                    "annotation": self.annotation,
+                    "id": self.id,
+                    "header": self.header,
+                    "neighbor_cells": self.neighbor_cells}
         # raise NotImplementedError
         return metadata
 
@@ -388,7 +405,8 @@ class MetaGraph(object):
         metadata = self.get_metadata()
         if merge:
             with open(out_path, 'a') as fout:
-                fout.write(json.dumps(metadata, ensure_ascii=False))
+                # fout.write(json.dumps(metadata, ensure_ascii=False))
+                fout.write(json.dumps(metadata))
                 fout.write('\n')
 
         else:
@@ -396,7 +414,11 @@ class MetaGraph(object):
                 fout.write(json.dumps(metadata, ensure_ascii=False, indent=2))
 
     def parse_snippet(self):
+        # pdb.set_trace()
+        # try:
         nodes = json.loads(parse_snippet(self.context))
+        # except:
+        #     pdb.set_trace()
 
         assert isinstance(nodes, list)
         # print('-'*20)
