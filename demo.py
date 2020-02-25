@@ -1,3 +1,10 @@
+# coding=utf-8
+# Created by Ge Zhang, 2019
+#
+# Demo
+# python3 demo.py
+
+
 import os
 from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
@@ -23,10 +30,13 @@ from config import data_path
 from constants import bootstrap_script, popover_script
 
 UPLOAD_FOLDER = './uploaded_files'
+EVALUATION_FOLDER = '/projects/bdata/jupyter/_7_1'
 DATA_ROOT = '/projects/bdata/jupyter/target'
 ALLOWED_EXTENSIONS = set(
     ['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'ipynb', 'html'])
-
+NUM_STAGES = 5
+STAGES = ['<stage>', 'wrangle', 'explore', 'model', 'evaluate', 'import']
+# STAGES2ID = {'wrangle':0, 'explore':1}
 py_exporter = PythonExporter()
 html_exporter = HTMLExporter()
 html_text_exporter = html2text.HTML2Text()
@@ -34,6 +44,7 @@ html_text_exporter = html2text.HTML2Text()
 app = Flask(__name__)
 # app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 *  1024 # set the maximize file size after which an upload is aborted
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['EVALUATION_FOLDER'] = EVALUATION_FOLDER
 
 app.config.update(dict(
     DEBUG=True,
@@ -188,6 +199,15 @@ def load_local_file(filename):
                             filename=filename))
 
 
+@app.route('/annotate/<filename>')
+def annotate(filename):
+    shutil.copyfile(os.path.join(
+        '/projects/bdata/jupyter/filtered_notebook', filename), os.path.join(
+            app.config['UPLOAD_FOLDER'], filename))
+    return redirect(url_for('annotatenb',
+                            filename=filename))
+
+
 @app.route('/remove_output/<filename>')
 def remove_output(filename):
     if filename.endswith('.ipynb'):
@@ -214,6 +234,7 @@ def remove_output(filename):
             app.config['UPLOAD_FOLDER'], filename))[0]
 
         soup = BeautifulSoup(html_source)
+
         # find decision points and their line numbers
         funcs, linenos = process_file('_', content=py_source)
         code_lines = py_source.split('\n')
@@ -261,6 +282,115 @@ def remove_output(filename):
     return render_template(filename.replace('.ipynb', '.html'))
 
 
+@app.route('/annotatenb/<filename>', methods=["POST", "GET"])
+def annotatenb(filename):
+    if request.form:
+        with open('./templates/{}'.format(filename.replace('.ipynb', '.html')), 'r') as f:
+            html_source = f.read()
+        soup = BeautifulSoup(html_source)
+        cells = soup.find_all("div", class_="inner_cell")
+        for k in request.form:
+            cell_id = int(k.split('_')[-1])
+            new_opt = request.form.get(k)
+
+            origine_opt = cells[cell_id].find('option', {'selected': True})
+            rpl_origin_opt = soup.new_tag("option")
+            rpl_origin_opt["value"] = origine_opt["value"]
+            rpl_origin_opt.string = origine_opt.string
+            origine_opt.replaceWith(rpl_origin_opt)
+            # pdb.set_trace()
+
+            cells[cell_id].find('option', {'value': new_opt})[
+                'selected'] = True
+
+        html_source = soup.prettify()
+
+        # dump new html
+        with open('./templates/{}'.format(filename.replace('.ipynb', '.html')), 'w') as fout:
+            fout.write(html_source)
+        return render_template(filename.replace('.ipynb', '.html'))
+
+        # pdb.set_trace()
+        # pass
+
+    if filename.endswith('.ipynb'):
+        # convert ipynb to html
+        if os.path.exists('./templates/{}'.format(filename.replace('.ipynb', '.html'))):
+            with open('./templates/{}'.format(filename.replace('.ipynb', '.html')), 'r') as f:
+                html_source = f.read()
+        else:
+            html_source = html_exporter.from_file(os.path.join(
+                app.config['EVALUATION_FOLDER'], filename))[0]
+            # remove cell output
+            html_source = remove_output_from_html(html_source)
+            # remove some html codes so that we can add our own elements
+            # I'm not sure about why but it works
+            html_source = remove_script(html_source)
+            # manually import "boostrap" things
+            html_source = bootstrap_script + html_source
+            # modify opacity so that our own elements are visible
+            html_source = html_source.replace('.fade {\n  opacity: 0;',
+                                              '.fade {\n  opacity: 90;')
+            html_source = html_source.replace('.popover {\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 1060;\n  display: none;',
+                                              '.popover {\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 1060;\n  display: block;')
+            # add popover function at the bottom of html
+            html_source = html_source.replace(
+                '</html>', popover_script + '</html>')
+        # convert ipynb to py
+        py_source = py_exporter.from_file(os.path.join(
+            app.config['EVALUATION_FOLDER'], filename))[0]
+
+        soup = BeautifulSoup(html_source)
+        if not os.path.exists('./templates/{}'.format(filename.replace('.ipynb', '.html'))):
+
+            # cells = soup.findAll("div", {"class": "inner_cell"})
+            new_form = soup.new_tag("form")
+            container = soup.find("div", class_="container")
+            contents = container.replaceWith(new_form)
+            new_form.append(contents)
+            new_button = soup.new_tag("button", type="submit")
+            # submit_tag = soup.new_tag("button", type="submit")
+            new_button.string = "Go"
+            new_form["action"] = "/annotatenb/{}".format(filename)
+            new_form["method"] = "POST"
+
+            container.append(new_button)
+            # new_form.append(container)
+            # container.replaceWith(new_form)
+            # pdb.set_trace()
+            for i_c, cell in enumerate(soup.find_all("div", class_="inner_cell")):
+                # new_form = soup.new_tag("form")
+                # new_form["action"] = "/annotatenb/{}".format(filename)
+                # new_form["method"] = "POST"
+                original_tag = cell
+                new_tag = soup.new_tag("select")
+                new_tag["name"] = "{}_{}".format("dropdown", i_c)
+                for i, s in enumerate(STAGES):
+                    opt = soup.new_tag("option")
+                    opt.string = '{} {}'.format(i, s)
+                    # opt.string = str(i)
+                    opt["value"] = i
+                    if s == '<stage>':
+                        opt["selected"] = True
+
+                    new_tag.append(opt)
+                # new_form.append(new_tag)
+                # submit_tag = soup.new_tag("button", type="submit")
+                # submit_tag.string = "Go"
+                # new_form.append(submit_tag)
+                original_tag.append(new_tag)
+            html_source = soup.prettify()
+
+            # dump new html
+            with open('./templates/{}'.format(filename.replace('.ipynb', '.html')), 'w') as fout:
+                fout.write(html_source)
+
+    else:
+        # file not ends with ".ipynb"
+        pass
+    return render_template(filename.replace('.ipynb', '.html'))
+
+
 # ======== Unimportant functions ===========
 
 
@@ -277,6 +407,13 @@ def bootstrap():
 @app.route('/readme')
 def temp():
     return render_template('readme.html')
+
+
+@app.route('/test', methods=["POST", "GET"])
+def test():
+    # pdb.set_trace()
+    select = request.form.get("dropdown")
+    return str(select)
 # ==========================================
 
 
