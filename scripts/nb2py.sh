@@ -1,7 +1,9 @@
 #!/bin/bash
-
-for i in `ls`;
+OldSuffix=".ipynb"
+NewSuffix=".py"
+for i in `ls *0.ipynb`;
 do
-# echo $i is file name\! ;
-jupyter nbconvert --to python $i ;
+	if [ ! -f "${i/$OldSuffix/$NewSuffix}" ]; then
+		jupyter nbconvert --to python $i ;
+	fi
 done
